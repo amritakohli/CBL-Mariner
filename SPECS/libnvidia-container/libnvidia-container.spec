@@ -13,8 +13,8 @@ URL:            https://github.com/NVIDIA/libnvidia-container
 Source0:        %{name}-%{version}.tar.gz
 #Source1:       https://github.com/NVIDIA/nvidia-modprobe/archive/%%{modprobe_version}.tar.gz
 Source1:        nvidia-modprobe-%{modprobe_version}.tar.gz
-Patch0:         common.mk.patch
-Patch1:         libtirpc.patch
+# Patch0:         common.mk.patch
+# Patch1:         libtirpc.patch
 Patch2:         nvidia-modprobe.patch
 BuildRequires:  libseccomp-devel
 BuildRequires:  libtirpc-devel
@@ -30,16 +30,16 @@ kernel subsystems and is designed to be agnostic of the container runtime.
 
 %prep
 %setup -q
-%patch0 -p1
-%patch1 -p1
+# %patch0 -p1
+# %patch1 -p1
 
 mkdir -p %{mod_probe_dir}
 tar -C %{mod_probe_dir} --strip-components=1 -xzf %{SOURCE1}
-%patch2 -p1 -d %{mod_probe_dir}
+%patch -P 2 -p1 -d %{mod_probe_dir}
 touch %{mod_probe_dir}/.download_stamp
 
 %build
-%make_build WITH_LIBELF=yes
+%make_build WITH_LIBELF=yes REVISION=074cf994e9190034f3a35f1247d3b0983633ccd3a00cb27f329ac3471cbb388f MAJOR=1 MINOR=14 PATCH=4
 
 %install
 DESTDIR=%{buildroot} make install prefix=%{_prefix} \
