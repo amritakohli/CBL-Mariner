@@ -5,14 +5,160 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/azurelinux/toolkit/tools/imagecustomizerapi"
 	"github.com/microsoft/azurelinux/toolkit/tools/internal/file"
 	"github.com/microsoft/azurelinux/toolkit/tools/internal/logger"
 	"github.com/microsoft/azurelinux/toolkit/tools/internal/shell"
 	"github.com/stretchr/testify/assert"
 )
 
+func TestCopyBlockDeviceToFile(t *testing.T) {
+	var err error
+	logger.Log.Infof("test")
+	baseImage := checkSkipForCustomizeImage(t, baseImageTypeCoreEfi)
+
+	buildDir := filepath.Join(tmpDir, "TestCustomizeImageKernelCommandLine")
+	outImageFilePath := filepath.Join(buildDir, "image.vhd")
+
+	// Customize image.
+	config := &imagecustomizerapi.Config{
+		OS: imagecustomizerapi.OS{
+			KernelCommandLine: imagecustomizerapi.KernelCommandLine{
+				ExtraCommandLine: "console=tty0 console=ttyS0",
+			},
+		},
+	}
+
+	err = CustomizeImage(buildDir, buildDir, config, baseImage, nil, outImageFilePath, "raw", "", false, false)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	imageConnection, err := connectToCoreEfiImage(buildDir, outImageFilePath)
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer imageConnection.Close()
+
+	// TODO: create some loop device
+	// diskFilePath, err := createFakeEfiImage(buildDir)
+	// assert.NoError(t, err)
+	// print(diskFilePath)
+	// TODO: provide some output dir
+	// outDir := tmpDir
+	// buildDir := tmpDir
+
+	// TODO: run copy function
+	// logger.Log.Infof("test")
+	// partitionFilename := "test"
+	// fullPath := filepath.Join(outDir, partitionFilename)
+	// partitionRawFilepath, err := createTestRawPartitionFile(fullPath)
+	// assert.NoError(t, err)
+
+	// print("image connection")
+	// imageConnection := NewImageConnection()
+	// err = imageConnection.ConnectLoopback(partitionRawFilepath)
+	// if err != nil {
+	// 	imageConnection.Close()
+	// 	fmt.Println("%w", err)
+	// 	return
+	// }
+
+	// // Create fake disk.
+	// diskFilePath, err := createFakeEfiImage(buildDir)
+	// if !assert.NoError(t, err) {
+	// 	return
+	// }
+	// logger.Log.Infof("%s", diskFilePath)
+
+	// print("printing")
+	// logger.Log.Infof("Devie path is as follows: %s", imageConnection.Loopback().DevicePath())
+
+	// TODO: assert no err
+	// TODO: assert full path is as expected
+	// TODO: check that full path exists
+
+}
+
+// func createFakeEfiImage(buildDir string) (string, error) {
+// 	var err error
+
+// 	err = os.MkdirAll(buildDir, os.ModePerm)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to make build directory (%s):\n%w", buildDir, err)
+// 	}
+
+// 	// Use a prototypical Mariner image partition config.
+// 	diskConfig := imagecustomizerapi.Disk{
+// 		PartitionTableType: imagecustomizerapi.PartitionTableTypeGpt,
+// 		MaxSize:            4096,
+// 		Partitions: []imagecustomizerapi.Partition{
+// 			{
+// 				ID:     "boot",
+// 				Flags:  []imagecustomizerapi.PartitionFlag{"esp", "boot"},
+// 				Start:  1,
+// 				End:    ptrutils.PtrTo(uint64(9)),
+// 				FsType: "fat32",
+// 			},
+// 			{
+// 				ID:     "rootfs",
+// 				Start:  9,
+// 				End:    nil,
+// 				FsType: "ext4",
+// 			},
+// 		},
+// 	}
+
+// 	partitionSettings := []imagecustomizerapi.PartitionSetting{
+// 		{
+// 			ID:              "boot",
+// 			MountPoint:      "/boot/efi",
+// 			MountOptions:    "umask=0077",
+// 			MountIdentifier: imagecustomizerapi.MountIdentifierTypeDefault,
+// 		},
+// 		{
+// 			ID:              "rootfs",
+// 			MountPoint:      "/",
+// 			MountIdentifier: imagecustomizerapi.MountIdentifierTypeDefault,
+// 		},
+// 	}
+
+// 	rawDisk := filepath.Join(buildDir, "disk.raw")
+
+// 	installOS := func(imageChroot *safechroot.Chroot) error {
+// 		// Don't write anything for the OS.
+// 		// The createNewImage function will still write the bootloader and fstab file, which will allow the partition
+// 		// discovery logic to work. This allows for a limited set of tests to run without needing any of the RPM files.
+// 		return nil
+// 	}
+
+// 	err = createNewImage(rawDisk, diskConfig, partitionSettings, "efi",
+// 		imagecustomizerapi.KernelCommandLine{}, buildDir, testImageRootDirName, installOS)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	return rawDisk, nil
+// }
+
+func TestCompressWithZstd(t *testing.T) {
+	// Create test raw partition file
+	partitionFilename := "test"
+	partitionRawFilepath, err := createTestRawPartitionFile(partitionFilename)
+	assert.NoError(t, err)
+
+	// Compress file with zstd and name it with the given output partition file path
+	outputPartitionFilepath := "out.raw.zst"
+	err = compressWithZstd(partitionRawFilepath, outputPartitionFilepath)
+	assert.NoError(t, err)
+
+	// Check that the output file exists as expected
+	_, err = os.Stat("out.raw.zst")
+	assert.NoError(t, err)
+}
 func TestAddSkippableFrame(t *testing.T) {
 	// Create a skippable frame containing the metadata and prepend the frame to the partition file
 	skippableFrameMetadata, err := createSkippableFrameMetadata()
