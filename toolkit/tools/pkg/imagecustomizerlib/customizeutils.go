@@ -20,6 +20,7 @@ import (
 	"github.com/microsoft/azurelinux/toolkit/tools/internal/shell"
 	"github.com/microsoft/azurelinux/toolkit/tools/internal/sliceutils"
 	"github.com/microsoft/azurelinux/toolkit/tools/internal/userutils"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -37,6 +38,9 @@ func doCustomizations(buildDir string, baseConfigPath string, config *imagecusto
 
 	buildTime := time.Now().Format("2006-01-02T15:04:05Z")
 
+	// TODO remove temp flag
+	var cleanUpFlag bool = true
+
 	err = overrideResolvConf(imageChroot)
 	if err != nil {
 		return err
@@ -46,6 +50,13 @@ func doCustomizations(buildDir string, baseConfigPath string, config *imagecusto
 		useBaseImageRpmRepos)
 	if err != nil {
 		return err
+	}
+
+	if cleanUpFlag {
+		err = cleanUpImage(imageChroot)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = UpdateHostname(config.OS.Hostname, imageChroot)
@@ -136,6 +147,42 @@ func doCustomizations(buildDir string, baseConfigPath string, config *imagecusto
 	}
 
 	return nil
+}
+
+// Clean up tdnf cache and journald
+func cleanUpImage(imageChroot *safechroot.Chroot) error {
+	logger.Log.Infof("Cleaning up image")
+
+	tdnfArgs := []string{
+		"-v", "clean", "all",
+	}
+
+	stdoutCallback := func(line string) {
+		logger.Log.Trace(line)
+	}
+
+	return imageChroot.UnsafeRun(func() error {
+		return shell.NewExecBuilder("tdnf", tdnfArgs...).
+			StdoutCallback(stdoutCallback).
+			LogLevel(shell.LogDisabledLevel, logrus.DebugLevel).
+			ErrorStderrLines(1).
+			Execute()
+	})
+
+	// return nil
+
+	// // TODO - no prefix for now. do we want one?
+	// err := callTdnf(tdnfCleanArgs, "Cleaning", imageChroot)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to clean tdnf package cache")
+	// }
+
+	// err = callTdnf(tdnfCleanArgs, "Cleaning", imageChroot)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to clean tdnf package cache")
+	// }
+
+	// return nil
 }
 
 // Override the resolv.conf file, so that in-chroot processes can access the network.
