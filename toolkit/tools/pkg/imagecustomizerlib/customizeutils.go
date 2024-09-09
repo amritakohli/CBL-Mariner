@@ -149,7 +149,7 @@ func doCustomizations(buildDir string, baseConfigPath string, config *imagecusto
 	return nil
 }
 
-// Clean up tdnf cache and journald
+// Clean up tdnf cache
 func cleanUpImage(imageChroot *safechroot.Chroot) error {
 	logger.Log.Infof("Cleaning up image")
 
@@ -158,7 +158,7 @@ func cleanUpImage(imageChroot *safechroot.Chroot) error {
 	}
 
 	stdoutCallback := func(line string) {
-		logger.Log.Trace(line)
+		logger.Log.Info(line)
 	}
 
 	return imageChroot.UnsafeRun(func() error {
