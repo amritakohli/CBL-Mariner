@@ -61,6 +61,7 @@ type ImageCustomizerParameters struct {
 	// configurations
 	configPath                  string
 	config                      *imagecustomizerapi.Config
+	configFile                  string
 	customizeOSPartitions       bool
 	useBaseImageRpmRepos        bool
 	rpmsSources                 []string
@@ -83,7 +84,7 @@ func createImageCustomizerParameters(buildDir string,
 	inputImageFile string,
 	configPath string, config *imagecustomizerapi.Config,
 	useBaseImageRpmRepos bool, rpmsSources []string, enableShrinkFilesystems bool, outputSplitPartitionsFormat string,
-	outputImageFormat string, outputImageFile string, outputPXEArtifactsDir string) (*ImageCustomizerParameters, error) {
+	outputImageFormat string, outputImageFile string, outputPXEArtifactsDir string, configFile string) (*ImageCustomizerParameters, error) {
 
 	ic := &ImageCustomizerParameters{}
 
@@ -108,6 +109,7 @@ func createImageCustomizerParameters(buildDir string,
 	ic.customizeOSPartitions = config.CustomizePartitions() || config.OS != nil ||
 		len(config.Scripts.PostCustomization) > 0 ||
 		len(config.Scripts.FinalizeCustomization) > 0
+	ic.configFile = configFile
 
 	ic.useBaseImageRpmRepos = useBaseImageRpmRepos
 	ic.rpmsSources = rpmsSources
@@ -196,7 +198,7 @@ func CustomizeImageWithConfigFile(buildDir string, configFile string, imageFile 
 	}
 
 	err = CustomizeImage(buildDir, absBaseConfigPath, &config, imageFile, rpmsSources, outputImageFile, outputImageFormat,
-		outputSplitPartitionsFormat, outputPXEArtifactsDir, useBaseImageRpmRepos, enableShrinkFilesystems)
+		outputSplitPartitionsFormat, outputPXEArtifactsDir, useBaseImageRpmRepos, enableShrinkFilesystems, configFile)
 	if err != nil {
 		return err
 	}
@@ -215,7 +217,7 @@ func cleanUp(ic *ImageCustomizerParameters) error {
 
 func CustomizeImage(buildDir string, baseConfigPath string, config *imagecustomizerapi.Config, imageFile string,
 	rpmsSources []string, outputImageFile string, outputImageFormat string, outputSplitPartitionsFormat string,
-	outputPXEArtifactsDir string, useBaseImageRpmRepos bool, enableShrinkFilesystems bool,
+	outputPXEArtifactsDir string, useBaseImageRpmRepos bool, enableShrinkFilesystems bool, configFile string,
 ) error {
 	err := validateConfig(baseConfigPath, config, rpmsSources, useBaseImageRpmRepos)
 	if err != nil {
@@ -225,7 +227,7 @@ func CustomizeImage(buildDir string, baseConfigPath string, config *imagecustomi
 	imageCustomizerParameters, err := createImageCustomizerParameters(buildDir, imageFile,
 		baseConfigPath, config,
 		useBaseImageRpmRepos, rpmsSources, enableShrinkFilesystems, outputSplitPartitionsFormat,
-		outputImageFormat, outputImageFile, outputPXEArtifactsDir)
+		outputImageFormat, outputImageFile, outputPXEArtifactsDir, configFile)
 	if err != nil {
 		return fmt.Errorf("failed to create image customizer parameters object:\n%w", err)
 	}
@@ -369,7 +371,7 @@ func customizeOSContents(ic *ImageCustomizerParameters) error {
 
 	// Customize the raw image file.
 	err = customizeImageHelper(ic.buildDirAbs, ic.configPath, ic.config, ic.rawImageFile, ic.rpmsSources,
-		ic.useBaseImageRpmRepos, partitionsCustomized, imageUuidStr)
+		ic.useBaseImageRpmRepos, partitionsCustomized, imageUuidStr, ic.inputImageFile, ic.configFile)
 	if err != nil {
 		return err
 	}
@@ -669,7 +671,7 @@ func validatePackageLists(baseConfigPath string, config *imagecustomizerapi.OS, 
 
 func customizeImageHelper(buildDir string, baseConfigPath string, config *imagecustomizerapi.Config,
 	rawImageFile string, rpmsSources []string, useBaseImageRpmRepos bool, partitionsCustomized bool,
-	imageUuidStr string,
+	imageUuidStr string, inputImageFile string, configFile string,
 ) error {
 	logger.Log.Debugf("Customizing OS")
 
@@ -681,7 +683,7 @@ func customizeImageHelper(buildDir string, baseConfigPath string, config *imagec
 
 	// Do the actual customizations.
 	err = doOsCustomizations(buildDir, baseConfigPath, config, imageConnection, rpmsSources,
-		useBaseImageRpmRepos, partitionsCustomized, imageUuidStr)
+		useBaseImageRpmRepos, partitionsCustomized, imageUuidStr, inputImageFile, configFile)
 
 	// Out of disk space errors can be difficult to diagnose.
 	// So, warn about any partitions with low free space.
