@@ -139,7 +139,6 @@ func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImag
 		// create the directory
 		logger.Log.Info("creating configs dir")
 		os.Mkdir(configsDirPath, 0755)
-		// TODO set permission accurately
 	}
 
 	currentImageHistory.ImageUuid = imageUuid
@@ -147,12 +146,8 @@ func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImag
 	currentImageHistory.BuildTime = buildTime
 	currentImageHistory.ToolVersion = toolVersion
 	currentImageHistory.ParentImage.ImageName = filepath.Base(inputImageFile)
-	logger.Log.Infof(configFile)
 	str := strings.TrimSuffix(filepath.Base(configFile), filepath.Ext(configFile)) + "_config" + strconv.Itoa(configNum) + ".yaml"
 	str = filepath.Join(configsDirPath, str)
-	logger.Log.Info("str w configs")
-	logger.Log.Info(str)
-	// TODO: in design doc, ask for feedback on the config naming convention. should it be underscores or hyphens? do we want to use the original name or not?
 	configFileToStore, err := os.Create(str)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
