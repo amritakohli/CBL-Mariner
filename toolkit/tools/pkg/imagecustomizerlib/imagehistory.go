@@ -41,17 +41,17 @@ type ImageHistory struct {
 	AdditionalFiles []AdditionalFiles `json:"additionalfiles"`
 }
 
-func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImageFile string, configFile string, baseConfigPath string, toolVersion string, buildTime string, additionalFiles imagecustomizerapi.AdditionalFilesMap, scripts *imagecustomizerapi.Scripts) error {
+func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImageFile string, configFile string, baseConfigPath string, toolVersion string, buildTime string, additionalFiles imagecustomizerapi.AdditionalFileList, scripts imagecustomizerapi.Scripts) error {
 	var err error
 	var additionalFilesList []AdditionalFiles
-	for sourceFile := range additionalFiles {
+	for i := range additionalFiles {
 		var additionalFile AdditionalFiles
-		absSourceFile := file.GetAbsPathWithBase(baseConfigPath, sourceFile)
+		absSourceFile := file.GetAbsPathWithBase(baseConfigPath, additionalFiles[i].Source)
 		hash, err := file.GenerateSHA256(absSourceFile)
 		if err != nil {
 			return err
 		}
-		additionalFile.SourcePath = sourceFile
+		additionalFile.SourcePath = additionalFiles[i].Source
 		additionalFile.Hash = hash
 		additionalFilesList = append(additionalFilesList, additionalFile)
 	}
