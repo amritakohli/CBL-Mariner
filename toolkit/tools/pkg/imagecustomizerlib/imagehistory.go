@@ -16,64 +16,22 @@ import (
 	"github.com/microsoft/azurelinux/toolkit/tools/internal/safechroot"
 )
 
-type HistoryAdditionalFileList []HistoryAdditionalFile
-type HistoryDirConfigList []HistoryDirConfig
-
-type HistoryDirConfig struct {
-	imagecustomizerapi.DirConfig
-	SHA256Hashes map[string]string `yaml:"sha256hash" json:"sha256hash"`
-}
-type HistoryAdditionalFile struct {
-	AdditionalFile imagecustomizerapi.AdditionalFile `yaml:"additionalfile" json:"additionalfile"`
-	SHA256Hash     string                            `yaml:"sha256hash" json:"sha256hash"`
-}
-
 type ParentImage struct {
 	ImageName string `yaml:"imagename" json:"imagename"`
 	Hash      string `yaml:"hash" json:"hash"`
 }
-type ScriptWithHash struct {
-	Script     imagecustomizerapi.Script `yaml:"script" json:"script"`
-	SHA256Hash string                    `yaml:"sha256hash" json:"sha256hash"`
-}
-type ScriptsList struct {
-	PostCustomization     []ScriptWithHash `yaml:"postCustomization" json:"postCustomization"`
-	FinalizeCustomization []ScriptWithHash `yaml:"finalizeCustomization" json:"finalizeCustomization"`
-}
 
-type HistoryOS struct {
-	ResetBootLoaderType imagecustomizerapi.ResetBootLoaderType `yaml:"resetBootLoaderType" json:"resetBootLoaderType"`
-	Hostname            string                                 `yaml:"hostname" json:"hostname"`
-	Packages            imagecustomizerapi.Packages            `yaml:"packages" json:"packages"`
-	SELinux             imagecustomizerapi.SELinux             `yaml:"selinux" json:"selinux"`
-	KernelCommandLine   imagecustomizerapi.KernelCommandLine   `yaml:"kernelCommandLine" json:"kernelCommandLine"`
-	AdditionalFiles     HistoryAdditionalFileList              `yaml:"additionalFiles" json:"additionalFiles"`
-	AdditionalDirs      HistoryDirConfigList                   `yaml:"additionalDirs" json:"additionalDirs"`
-	Users               []imagecustomizerapi.User              `yaml:"users" json:"users"`
-	Services            imagecustomizerapi.Services            `yaml:"services" json:"services"`
-	Modules             []imagecustomizerapi.Module            `yaml:"modules" json:"modules"`
-	Overlays            *[]imagecustomizerapi.Overlay          `yaml:"overlays" json:"overlays"`
-}
-type HistoryConfig struct {
-	Storage imagecustomizerapi.Storage `yaml:"storage" json:"storage"`
-	Iso     *imagecustomizerapi.Iso    `yaml:"iso" json:"iso"`
-	Pxe     *imagecustomizerapi.Pxe    `yaml:"pxe" json:"pxe"`
-	OS      *HistoryOS                 `yaml:"os" json:"os"`
-	Scripts ScriptsList                `yaml:"scripts" json:"scripts"`
-}
 type ImageHistory struct {
-	BuildTime     string        `yaml:"datetime" json:"datetime"`
-	ToolVersion   string        `yaml:"toolversion" json:"toolversion"`
-	ImageUuid     string        `yaml:"imageuuid" json:"imageuuid"`
-	ParentImage   ParentImage   `yaml:"parentimage" json:"parentimage"`
-	HistoryConfig HistoryConfig `yaml:"config" json:"config"`
+	BuildTime   string                    `yaml:"datetime" json:"datetime"`
+	ToolVersion string                    `yaml:"toolversion" json:"toolversion"`
+	ImageUuid   string                    `yaml:"imageuuid" json:"imageuuid"`
+	ParentImage ParentImage               `yaml:"parentimage" json:"parentimage"`
+	Config      imagecustomizerapi.Config `yaml:"config" json:"config"`
 }
 
-func populateAdditionalDirs(configAdditionalDirs imagecustomizerapi.DirConfigList, baseConfigPath string) (HistoryDirConfigList, error) {
-	var historyDirConfigList = make([]HistoryDirConfig, len(configAdditionalDirs))
+func populateAdditionalDirs(configAdditionalDirs imagecustomizerapi.DirConfigList, baseConfigPath string) error {
 
 	for i := range configAdditionalDirs {
-		historyDirConfigList[i].DirConfig = configAdditionalDirs[i]
 		hashes := make(map[string]string)
 		path := configAdditionalDirs[i].Source
 		dirPath := file.GetAbsPathWithBase(baseConfigPath, path)
@@ -104,67 +62,38 @@ func populateAdditionalDirs(configAdditionalDirs imagecustomizerapi.DirConfigLis
 			return nil
 		})
 		if err != nil {
-			return historyDirConfigList, err
+			return err
 		}
-		historyDirConfigList[i].SHA256Hashes = hashes
+		configAdditionalDirs[i].SHA256HashMap = hashes
 	}
-	return historyDirConfigList, nil
+	return nil
 }
 
-func populateAdditionalFiles(configAdditionalFiles imagecustomizerapi.AdditionalFileList, baseConfigPath string) (HistoryAdditionalFileList, error) {
-	var historyAdditionalFileList = make([]HistoryAdditionalFile, len(configAdditionalFiles))
+func populateAdditionalFiles(configAdditionalFiles imagecustomizerapi.AdditionalFileList, baseConfigPath string) error {
 
 	for i := range configAdditionalFiles {
-		historyAdditionalFileList[i].AdditionalFile = configAdditionalFiles[i]
 		if configAdditionalFiles[i].Source == "" {
 			continue
 		}
 		absSourceFile := file.GetAbsPathWithBase(baseConfigPath, configAdditionalFiles[i].Source)
 		hash, err := file.GenerateSHA256(absSourceFile)
 		if err != nil {
-			return historyAdditionalFileList, err
+			return err
 		}
-		historyAdditionalFileList[i].SHA256Hash = hash
+		configAdditionalFiles[i].SHA256Hash = hash
 	}
-	return historyAdditionalFileList, nil
+	return nil
 }
-func populateOS(configOS imagecustomizerapi.OS, baseConfigPath string) (HistoryOS, error) {
+func populateOS(configOS imagecustomizerapi.OS, baseConfigPath string) error {
 
-	var historyOS HistoryOS
-	historyOS.ResetBootLoaderType = configOS.ResetBootLoaderType
-	historyOS.Hostname = configOS.Hostname
-	historyOS.Packages = configOS.Packages
-	historyOS.SELinux = configOS.SELinux
-	historyOS.KernelCommandLine = configOS.KernelCommandLine
-	historyOS.Users = configOS.Users
-	historyOS.Services = configOS.Services
-	historyOS.Modules = configOS.Modules
-	historyOS.Overlays = configOS.Overlays
+	populateAdditionalFiles(configOS.AdditionalFiles, baseConfigPath)
 
-	historyAdditionalFileList, err := populateAdditionalFiles(configOS.AdditionalFiles, baseConfigPath)
-
-	if err != nil {
-		return historyOS, err
-	}
-
-	historyOS.AdditionalFiles = historyAdditionalFileList
-
-	historyAdditionalDirsList, err := populateAdditionalDirs(configOS.AdditionalDirs, baseConfigPath)
-
-	if err != nil {
-		return historyOS, err
-	}
-
-	historyOS.AdditionalDirs = historyAdditionalDirsList
-
-	return historyOS, nil
+	populateAdditionalDirs(configOS.AdditionalDirs, baseConfigPath)
+	return nil
 }
-func populateScriptsList(scripts imagecustomizerapi.Scripts, baseConfigPath string) (ScriptsList, error) {
-	var scriptslist ScriptsList
-	scriptslist.PostCustomization = make([]ScriptWithHash, len(scripts.PostCustomization))
-	scriptslist.FinalizeCustomization = make([]ScriptWithHash, len(scripts.FinalizeCustomization))
+func populateScriptsList(scripts imagecustomizerapi.Scripts, baseConfigPath string) error {
+
 	for i := range scripts.PostCustomization {
-		scriptslist.PostCustomization[i].Script = scripts.PostCustomization[i]
 		path := scripts.PostCustomization[i].Path
 		if path == "" {
 			// ignore entry if content is provided instead of path
@@ -173,12 +102,11 @@ func populateScriptsList(scripts imagecustomizerapi.Scripts, baseConfigPath stri
 		absSourceFile := file.GetAbsPathWithBase(baseConfigPath, path)
 		hash, err := file.GenerateSHA256(absSourceFile)
 		if err != nil {
-			return scriptslist, err
+			return err
 		}
-		scriptslist.PostCustomization[i].SHA256Hash = hash
+		scripts.PostCustomization[i].SHA256Hash = hash
 	}
 	for i := range scripts.FinalizeCustomization {
-		scriptslist.FinalizeCustomization[i].Script = scripts.FinalizeCustomization[i]
 		path := scripts.FinalizeCustomization[i].Path
 		if path == "" {
 			// ignore entry if content is provided instead of path
@@ -187,18 +115,18 @@ func populateScriptsList(scripts imagecustomizerapi.Scripts, baseConfigPath stri
 		absSourceFile := file.GetAbsPathWithBase(baseConfigPath, path)
 		hash, err := file.GenerateSHA256(absSourceFile)
 		if err != nil {
-			return scriptslist, err
+			return err
 		}
-		scriptslist.FinalizeCustomization[i].SHA256Hash = hash
+		scripts.FinalizeCustomization[i].SHA256Hash = hash
 
 	}
 
-	return scriptslist, nil
+	return nil
 
 }
 func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImageFile string, configFile string, baseConfigPath string, toolVersion string, buildTime string, config *imagecustomizerapi.Config) error {
 	var err error
-	scriptsList, err := populateScriptsList(config.Scripts, baseConfigPath)
+	err = populateScriptsList(config.Scripts, baseConfigPath)
 	if err != nil {
 		return err
 	}
@@ -207,7 +135,7 @@ func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImag
 		return err
 	}
 
-	historyOS, err := populateOS(*config.OS, baseConfigPath)
+	err = populateOS(*config.OS, baseConfigPath)
 	if err != nil {
 		return err
 	}
@@ -245,14 +173,7 @@ func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImag
 	currentImageHistory.BuildTime = buildTime
 	currentImageHistory.ToolVersion = toolVersion
 	currentImageHistory.ParentImage.ImageName = filepath.Base(inputImageFile)
-	var historyConfig HistoryConfig
-	historyConfig.Iso = config.Iso
-	historyConfig.OS = &historyOS
-	historyConfig.Pxe = config.Pxe
-	historyConfig.Scripts = scriptsList
-
-	historyConfig.Storage = config.Storage
-	currentImageHistory.HistoryConfig = historyConfig
+	currentImageHistory.Config = *config
 
 	allImageHistory = append(allImageHistory, currentImageHistory)
 
@@ -260,10 +181,6 @@ func addImageHistory(imageChroot *safechroot.Chroot, imageUuid string, inputImag
 	if err != nil {
 		return err
 	}
-	// jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
-	// if err != nil {
-	// 	return fmt.Errorf("error marshaling JSON: %v", err)
-	// }
 	file.Write(string(yamlBytes), imageHistoryFilePath)
 
 	return nil
