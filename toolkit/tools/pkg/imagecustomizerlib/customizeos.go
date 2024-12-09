@@ -64,7 +64,7 @@ func doOsCustomizations(buildDir string, baseConfigPath string, config *imagecus
 		return err
 	}
 
-	err = addImageHistory(imageChroot, imageUuid, inputImageFile, configFile, baseConfigPath, ToolVersion, buildTime, config.OS.AdditionalFiles, config.Scripts, config)
+	err = addImageHistory(imageChroot, imageUuid, inputImageFile, configFile, baseConfigPath, ToolVersion, buildTime, config)
 	if err != nil {
 		return err
 	}
